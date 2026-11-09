@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { builtinModels } from "@earendil-works/pi-ai/providers/all";
 import type { SecretStore } from "@rakazo/adapter-kit";
+import type { ThinkingLevel } from "@rakazo/contracts";
 import { canonicalPiProviderId } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { parseModelSecret } from "./model-secret.js";
@@ -62,6 +64,21 @@ export function trustedProviderModels(provider: string, ids: readonly string[]):
 
 const siblingModels = builtinModels();
 
+/**
+ * Efforts a caller may save. Bundled cards win. A model that exists only on the
+ * account's live list uses the same sibling card the run will call.
+ */
+export function listedThinkingLevels(
+  provider: string,
+  modelId: string,
+): ThinkingLevel[] | undefined {
+  provider = canonicalPiProviderId(provider);
+  return (
+    listPiCatalog().find((item) => item.provider === provider && item.id === modelId)
+      ?.thinkingLevels ?? liveCatalogEntry(provider, modelId)?.thinkingLevels
+  );
+}
+
 export function liveCatalogEntry(provider: string, id: string): PiCatalogEntry | undefined {
   provider = canonicalPiProviderId(provider);
   const entry = listPiCatalog().find((entry) => entry.provider === provider);
@@ -74,7 +91,9 @@ export function liveCatalogEntry(provider: string, id: string): PiCatalogEntry |
     label: catalogModelLabel(id),
     live: true,
     reasoning: model.reasoning,
-    thinkingLevels: ["off"],
+    // The run uses this sibling's effort map. The picker has to offer the same
+    // levels, or a supported effort is cleared before it is saved.
+    thinkingLevels: getSupportedThinkingLevels(model) as ThinkingLevel[],
     images: model.input.includes("image"),
   };
 }
