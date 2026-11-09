@@ -19,7 +19,11 @@ import {
 } from "./pi-catalog-availability.js";
 import type { CodexLiveCatalog, CodexLiveReadOptions } from "./pi-codex-catalog.js";
 import { codexLiveListsModel } from "./pi-codex-catalog.js";
-import { liveCatalogEntry, providerLiveListsModel } from "./pi-live-catalog.js";
+import {
+  listedThinkingLevels,
+  liveCatalogEntry,
+  providerLiveListsModel,
+} from "./pi-live-catalog.js";
 import { listPiCatalog, offeredCatalog, scriptedCatalogEntry } from "./pi-models.js";
 import type { StoredModelSecret } from "./pi-oauth.js";
 import { parseModelSecret } from "./pi-oauth.js";
@@ -562,9 +566,7 @@ export async function validateBotModelChange(
       : await findConnectedModelCredential(deps.prisma, deps.secretStore, scope, provider, model);
     if (!credential) {
       if (hosted && isCatalogModelChoice(provider, model)) {
-        const allowed = listPiCatalog().find(
-          (entry) => entry.provider === provider && entry.id === model,
-        )?.thinkingLevels;
+        const allowed = listedThinkingLevels(provider, model);
         if (
           input.thinkingLevel &&
           allowed &&
@@ -653,9 +655,7 @@ export async function prepareAllowedThinkingLevels(
 }> {
   if (provider !== OPENAI_COMPATIBLE_PROVIDER_ID) {
     return {
-      allowed: listPiCatalog().find(
-        (item) => item.provider === canonicalPiProviderId(provider) && item.id === modelId,
-      )?.thinkingLevels,
+      allowed: listedThinkingLevels(provider, modelId),
     };
   }
   const credential = await findConnectedModelCredential(

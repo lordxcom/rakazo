@@ -1,9 +1,12 @@
+import { clampThinkingLevel, getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { DEFAULT_MODEL_CONTEXT_WINDOW } from "@rakazo/contracts";
+import { clampCatalogThinkingLevel } from "@rakazo/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodexCatalogCache } from "./pi-codex-catalog.js";
 import { liveModelCatalogEnabled } from "./pi-live-cache.js";
 import {
   applyProviderLiveCatalog,
+  listedThinkingLevels,
   liveCatalogEntry,
   ProviderCatalogCache,
   providerLiveCatalogsForSpace,
@@ -91,6 +94,25 @@ describe("live catalog merge and execution", () => {
       reasoning: true,
       contextWindow: 16_384,
     });
+  });
+  it("keeps low for the dated DeepSeek flash id this snapshot does not bundle", () => {
+    const id = "deepseek/deepseek-v4.1-flash-1017";
+    expect(listPiCatalog().some((item) => item.provider === "openrouter" && item.id === id)).toBe(
+      false,
+    );
+    const entry = liveCatalogEntry("openrouter", id);
+    const model = resolveRuntimeModel({ provider: "openrouter", id }).model;
+    expect(entry?.reasoning).toBe(true);
+    expect(entry?.thinkingLevels).toEqual(["off", "low", "high", "max"]);
+    expect(entry?.thinkingLevels).toEqual(getSupportedThinkingLevels(model!));
+    expect(listedThinkingLevels("openrouter", id)).toEqual(entry?.thinkingLevels);
+    expect(clampCatalogThinkingLevel("low", entry?.thinkingLevels)).toBe("low");
+    expect(clampCatalogThinkingLevel("minimal", entry?.thinkingLevels)).toBe("low");
+    expect(clampThinkingLevel(model!, "low")).toBe("low");
+    expect(clampThinkingLevel(model!, "minimal")).toBe("low");
+  });
+  it("does not advertise thinking for an unrelated live model", () => {
+    expect(liveCatalogEntry("openrouter", "vendor/new-chat")?.thinkingLevels).toEqual(["off"]);
   });
   it("gives a live-only model the default window instead of an unrelated sibling's", () => {
     const unrelated = resolveRuntimeModel({ provider: "openrouter", id: "vendor/new-chat:free" });
